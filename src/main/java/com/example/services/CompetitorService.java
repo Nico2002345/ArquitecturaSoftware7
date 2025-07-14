@@ -5,75 +5,84 @@
  */
 package com.example.services;
 
+import com.example.PersistenceManager;
 import com.example.models.Competitor;
 import com.example.models.CompetitorDTO;
-
-import javax.ejb.Stateless;
-import javax.persistence.*;
-import javax.ws.rs.*;
+import java.util.List;
+import javax.annotation.PostConstruct;
+import javax.persistence.EntityManager;
+import javax.persistence.PersistenceContext;
+import javax.persistence.Query;
+import javax.ws.rs.GET;
+import javax.ws.rs.POST;
+import javax.ws.rs.Path;
+import javax.ws.rs.Produces;
 import javax.ws.rs.core.MediaType;
 import javax.ws.rs.core.Response;
-import java.util.*;
+import org.json.simple.JSONObject;
 
-@Stateless
+/**
+ *
+ * @author Mauricio
+ */
 @Path("/competitors")
 @Produces(MediaType.APPLICATION_JSON)
-@Consumes(MediaType.APPLICATION_JSON)
 public class CompetitorService {
 
     @PersistenceContext(unitName = "competitorPU")
-    private EntityManager em;
+    EntityManager em;
+
+    @PostConstruct
+    public void init() {
+        try {
+            em = PersistenceManager.getInstance().getEntityManagerFactory().createEntityManager();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     @GET
+    @Path("/get")
+    @Produces(MediaType.APPLICATION_JSON)
     public Response getAll() {
-        try {
-           List<Competitor> competitors = em.createQuery(
-    "SELECT c FROM Competitor c ORDER BY c.surname ASC")
-    .getResultList();
-            return Response.ok(competitors)
-                    .header("Access-Control-Allow-Origin", "*")
-                    .build();
-
-        } catch (Exception e) {
-            return Response.status(500)
-                    .entity(Collections.singletonMap("error", "No se pudo obtener la lista de competidores"))
-                    .build();
-        }
+        Query q = em.createQuery("SELECT U FROM COMPETITOR U ORDER BY U.SURNAME ASC");
+        List<Competitor> competitors = q.getResultList();
+        return Response.status(200).header("Access-Control-Allow-Origin", "*").entity(competitors).build();
     }
 
     @POST
     @Path("/add")
-    public Response createCompetitor(CompetitorDTO dto) {
+    @Produces(MediaType.APPLICATION_JSON)
+    public Response createCompetitor(CompetitorDTO competitor) {
+        JSONObject rta = new JSONObject();
+        Competitor competitorTmp = new Competitor(competitor.getName(), competitor.getSurname(), competitor.getAge(), competitor.getTelephone(), competitor.getCellphone(), competitor.getAddress(), competitor.getCity(), competitor.getCountry(), false);
+        competitorTmp.setAddress(competitor.getAddress());
+        competitorTmp.setAge(competitor.getAge());
+        competitorTmp.setCellphone(competitor.getCellphone());
+        competitorTmp.setCity(competitor.getCity());
+        competitorTmp.setCountry(competitor.getCountry());
+        competitorTmp.setName(competitor.getName());
+        competitorTmp.setSurname(competitor.getSurname());
+        competitorTmp.setTelephone(competitor.getTelephone());
         try {
-            Competitor competitor = new Competitor(
-                    dto.getName(),
-                    dto.getSurname(),
-                    dto.getAge(),
-                    dto.getTelephone(),
-                    dto.getCellphone(),
-                    dto.getAddress(),
-                    dto.getCity(),
-                    dto.getCountry(),
-                    false,
-                    dto.getEmail(),
-                    dto.getPassword()
-            );
-
-            em.persist(competitor);
-
-           Map<String, Object> response = new HashMap<String, Object>();
-            response.put("competitorId", competitor.getId());
-
-            return Response.ok(response)
-                    .header("Access-Control-Allow-Origin", "*")
-                    .build();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            return Response.status(500)
-                    .entity(Collections.singletonMap("error", "Error al guardar el competidor"))
-                    .build();
+            em.getTransaction().begin();
+            em.persist(competitorTmp);
+            em.getTransaction().commit();
+            em.refresh(competitorTmp);
+            rta.put("competitorId", competitorTmp.getId());
+        } catch (Throwable t) {
+            t.printStackTrace();
+            if (em.getTransaction().isActive()) {
+                em.getTransaction().rollback();
+            }
+            competitorTmp = null;
+        } finally {
+            em.clear();
+            em.close();
         }
-    }
-}
 
+        return Response.status(200).header("Access-Control-Allow-Origin", "*").entity(rta).build();
+
+    }
+
+}

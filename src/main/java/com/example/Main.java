@@ -21,7 +21,7 @@ public class Main {
         String webport = System.getenv("PORT");
 
         if (webport == null || webport.isEmpty()) {
-            webport = "8082";
+            webport = "8081";
         }
 
         Server server = new Server(Integer.valueOf(webport));
@@ -34,7 +34,7 @@ public class Main {
         server.setHandler(root);
         server.start();
         server.join();
-        
+        server.stop();
     }
 
 }
